@@ -1,3 +1,5 @@
+import 'dart:developer';
+
 import 'package:flutter/material.dart';
 import 'package:loca/location.dart';
 
@@ -31,6 +33,49 @@ class Home extends StatefulWidget {
 }
 
 class _HomeState extends State<Home> {
+  Future<void> _startTracking() async {
+    final LocationService _locationService = LocationX();
+    try {
+      final permissionError = await _locationService.checkAndRequestPermissions();
+      if (permissionError != LocationError.granted) {
+        _handleError(permissionError);
+        return;
+      }
+
+      final backgroundError = await _locationService.enableBackgroundMode();
+      if (backgroundError != LocationError.granted) {
+        _handleError(backgroundError);
+        return;
+      }
+
+      final locationStream = await _locationService.getPositionStream();
+      locationStream.listen(
+        (location) {
+          log('Location: ${location.latitude}, ${location.longitude}');
+        },
+        onError: (error) {
+          if (error is LocationException) {
+            _handleError(error.error);
+          } else {
+            _handleError(LocationError.unknown);
+          }
+        },
+      );
+    } catch (e) {
+      _handleError(LocationError.unknown);
+    }
+  }
+
+  void _handleError(LocationError error) {
+    log('Error: ${error.message}');
+  }
+
+  @override
+  void initState() {
+    _startTracking();
+    super.initState();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -41,17 +86,6 @@ class _HomeState extends State<Home> {
           child: Column(
         children: [],
       )),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          LocationService service = LocationX();
-          await service.checkAndRequestPermissions();
-          await service.enableBackgroundMode();
-          (await service.getPositionStream()).listen((event) {
-            print('Location: ${event.latitude}, ${event.longitude}');
-          });
-        },
-        child: const Icon(Icons.location_history),
-      ),
     );
   }
 }
