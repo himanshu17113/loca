@@ -1,7 +1,10 @@
 import 'dart:developer';
 
 import 'package:flutter/material.dart';
-import 'package:loca/location.dart';
+import 'package:loca/data/location.dart';
+import 'package:loca/error.dart';
+
+import 'data/location_service.dart';
 
 void main() {
   runApp(const MyApp());
@@ -34,21 +37,21 @@ class Home extends StatefulWidget {
 
 class _HomeState extends State<Home> {
   Future<void> _startTracking() async {
-    final LocationService _locationService = LocationX();
+    final LocationService locationService = LocationX();
     try {
-      final permissionError = await _locationService.checkAndRequestPermissions();
+      final permissionError = await locationService.checkAndRequestPermissions();
       if (permissionError != LocationError.granted) {
         _handleError(permissionError);
         return;
       }
 
-      final backgroundError = await _locationService.enableBackgroundMode();
+      final backgroundError = await locationService.enableBackgroundMode();
       if (backgroundError != LocationError.granted) {
         _handleError(backgroundError);
         return;
       }
 
-      final locationStream = await _locationService.getPositionStream();
+      final locationStream = await locationService.getPositionStream();
       locationStream.listen(
         (location) {
           log('Location: ${location.latitude}, ${location.longitude}');
