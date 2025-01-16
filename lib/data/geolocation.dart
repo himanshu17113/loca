@@ -37,8 +37,8 @@ class Geolocation implements LocationService {
   Stream<Latlng> getPositionStream() {
     return Geolocator.getPositionStream(
       locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.bestForNavigation,
-        distanceFilter: 1,
+        accuracy: LocationAccuracy.reduced,
+     
         // timeLimit: Duration(seconds: 10),
       ),
     ).map((event) => Latlng(longitude: event.longitude, latitude: event.latitude));
