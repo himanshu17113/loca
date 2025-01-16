@@ -4,6 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:location/location.dart';
 import 'package:loca/Repo/loocation_repo.dart';
 import 'package:loca/latlng.dart';
+import 'package:permission_handler/permission_handler.dart' as p;
 
 /// Represents possible location-related errors
 enum LocationError {
@@ -38,10 +39,10 @@ extension LocationErrorExtension on LocationError {
 abstract class LocationService {
   /// Gets a stream of location updates
   Future<Stream<Latlng>> getPositionStream();
-  
+
   /// Checks and requests necessary permissions
   Future<LocationError> checkAndRequestPermissions();
-  
+
   /// Enables background location updates
   Future<LocationError> enableBackgroundMode();
 }
@@ -49,46 +50,45 @@ abstract class LocationService {
 /// Implementation using the Geolocator package
 class GeoLocationServiceImpl implements LocationService {
   final LocationRepository _locationRepository;
-  
-  GeoLocationServiceImpl({LocationRepository? locationRepository}) 
-    : _locationRepository = locationRepository ?? LocationRepository();
-    
+
+  GeoLocationServiceImpl({LocationRepository? locationRepository})
+      : _locationRepository = locationRepository ?? LocationRepository();
+
   @override
   Future<Stream<Latlng>> getPositionStream() async {
     final serviceError = await _checkLocationServices();
     if (serviceError != LocationError.granted) {
       throw LocationException(serviceError);
     }
-    
+
     final permissionError = await checkAndRequestPermissions();
     if (permissionError != LocationError.granted) {
       throw LocationException(permissionError);
     }
-    
+
     return _locationRepository.getPositionStream();
   }
-  
+
   @override
   Future<LocationError> checkAndRequestPermissions() async {
     try {
       var permission = await _locationRepository.checkPermissions();
-      
+
       if (permission == LocationPermission.denied) {
         permission = await _locationRepository.requestPermissions();
       }
-      
-      if (permission == LocationPermission.denied || 
-          permission == LocationPermission.deniedForever) {
+
+      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
         return LocationError.permissionDenied;
       }
-      
+
       return LocationError.granted;
     } catch (e) {
       log('Permission check failed: $e');
       return LocationError.unknown;
     }
   }
-  
+
   Future<LocationError> _checkLocationServices() async {
     try {
       final serviceEnabled = await _locationRepository.checkLocationServices();
@@ -98,7 +98,7 @@ class GeoLocationServiceImpl implements LocationService {
       return LocationError.unknown;
     }
   }
-  
+
   @override
   Future<LocationError> enableBackgroundMode() async {
     // Geolocator doesn't require explicit background mode enabling
@@ -109,29 +109,26 @@ class GeoLocationServiceImpl implements LocationService {
 /// Implementation using the Location package
 class LocationX implements LocationService {
   final Location _location;
-  
+
   LocationX({Location? location}) : _location = location ?? Location();
-  
+
   @override
   Future<Stream<Latlng>> getPositionStream() async {
     final permissionError = await checkAndRequestPermissions();
     if (permissionError != LocationError.granted) {
       throw LocationException(permissionError);
     }
-    
+
     final backgroundError = await enableBackgroundMode();
     if (backgroundError != LocationError.granted) {
       throw LocationException(backgroundError);
     }
-    
+
     return _location.onLocationChanged
-      .where((event) => event.latitude != null && event.longitude != null)
-      .map((event) => Latlng(
-        latitude: event.latitude!, 
-        longitude: event.longitude!
-      ));
+        .where((event) => event.latitude != null && event.longitude != null)
+        .map((event) => Latlng(latitude: event.latitude!, longitude: event.longitude!));
   }
-  
+
   @override
   Future<LocationError> checkAndRequestPermissions() async {
     try {
@@ -142,7 +139,7 @@ class LocationX implements LocationService {
           return LocationError.serviceDisabled;
         }
       }
-      
+
       final permissionStatus = await _location.hasPermission();
       if (permissionStatus == PermissionStatus.denied) {
         final requested = await _location.requestPermission();
@@ -150,14 +147,14 @@ class LocationX implements LocationService {
           return LocationError.permissionDenied;
         }
       }
-      
+
       return LocationError.granted;
     } catch (e) {
       log('Permission check failed: $e');
       return LocationError.unknown;
     }
   }
-  
+
   @override
   Future<LocationError> enableBackgroundMode() async {
     try {
@@ -165,7 +162,13 @@ class LocationX implements LocationService {
       if (bgModeEnabled) {
         return LocationError.granted;
       }
-      
+      final backgroundStatus = await p.Permission.locationAlways.status;
+      if (!backgroundStatus.isGranted) {
+        final result = await p.Permission.locationAlways.request();
+        if (!result.isGranted) {
+          return LocationError.backgroundModeFailed;
+        }
+      }
       final enabled = await _location.enableBackgroundMode();
       return enabled ? LocationError.granted : LocationError.backgroundModeFailed;
     } catch (e) {
@@ -178,9 +181,9 @@ class LocationX implements LocationService {
 /// Custom exception for location-related errors
 class LocationException implements Exception {
   final LocationError error;
-  
+
   LocationException(this.error);
-  
+
   @override
   String toString() => 'LocationException: ${error.message}';
 }
