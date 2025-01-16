@@ -51,7 +51,7 @@ class _HomeState extends State<Home> {
         return;
       }
 
-      final locationStream = await locationService.getPositionStream();
+      final locationStream = locationService.getPositionStream();
       locationStream.listen(
         (location) {
           log('Location: ${location.latitude}, ${location.longitude}');
